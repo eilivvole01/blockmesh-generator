@@ -1,0 +1,1093 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Lag blockMeshDict til OpenFOAM med tre systematisk raffinerte nett for nettuavhengighetsstudie (GCI), 3D-forhåndsvisning og sjekk av locationInMesh.">
+<title>blockMesh-generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+/* Layout: numbered input steps on the left, a preview + output panel on the right (sticky, own scroll) on wide screens; one column under 1000px */
+:root{
+  --bg:#f1f4f3; --surface:#fafcfb; --raised:#ffffff; --ink:#142022; --muted:#55666a;
+  --line:#d3dcdb; --line-strong:#b3c2c1;
+  --accent:#0a6970; --accent-ink:#ffffff; --accent-soft:#d8edec;
+  --warn:#8a4f00; --warn-soft:#faedd5; --bad:#ad2619; --bad-soft:#fbe2de; --ok:#1b6c3a; --ok-soft:#dcf1e3;
+  --grid:#8aa2a2; --face:#e2ebe9; --code-bg:#e9efee;
+  --font-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1314; --surface:#131b1d; --raised:#192326; --ink:#e1eae8; --muted:#92a4a3;
+    --line:#27353a; --line-strong:#3a4b4f;
+    --accent:#5ec3c6; --accent-ink:#04221f; --accent-soft:#143537;
+    --warn:#f1b35b; --warn-soft:#33250f; --bad:#ff8b7c; --bad-soft:#381815; --ok:#71d393; --ok-soft:#13301e;
+    --grid:#4e6567; --face:#1a282a; --code-bg:#0f1719;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1314; --surface:#131b1d; --raised:#192326; --ink:#e1eae8; --muted:#92a4a3;
+  --line:#27353a; --line-strong:#3a4b4f;
+  --accent:#5ec3c6; --accent-ink:#04221f; --accent-soft:#143537;
+  --warn:#f1b35b; --warn-soft:#33250f; --bad:#ff8b7c; --bad-soft:#381815; --ok:#71d393; --ok-soft:#13301e;
+  --grid:#4e6567; --face:#1a282a; --code-bg:#0f1719;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0}
+[hidden]{display:none!important}
+a{color:var(--accent)}
+.site-foot{padding-top:8px}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:var(--font-body); font-size:15px; line-height:1.5;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:28px 56px;
+}
+.wrap{max-width:1320px; margin:0 auto; display:grid; gap:24px}
+h1,h2,h3{font-family:var(--font-display); text-wrap:balance; margin:0; line-height:1.2}
+h1{font-weight:600; font-size:clamp(1.7rem, 1.2rem + 1.6vw, 2.4rem); letter-spacing:-0.01em}
+h2{font-weight:600; font-size:1.15rem}
+h3{font-weight:600; font-size:1rem}
+p{margin:0}
+code{font-family:var(--font-mono); font-size:.88em; background:var(--code-bg); padding:1px 5px; border-radius:4px}
+.top{display:grid; gap:8px; max-width:78ch}
+.eyebrow{font-family:var(--font-mono); font-size:.78rem; text-transform:uppercase; letter-spacing:.08em; color:var(--accent)}
+.lead{color:var(--ink); font-size:1.02rem}
+.example-note{color:var(--muted); font-size:.9rem}
+
+.layout{display:grid; gap:24px; align-items:start}
+@media (min-width:1000px){
+  .layout{grid-template-columns:minmax(0,1fr) minmax(0,1.08fr)}
+  .panel{position:sticky; top:calc(env(safe-area-inset-top, 0px) + 12px); max-height:calc(100dvh - 24px); overflow:auto; padding-right:4px}
+}
+.steps{display:grid; gap:16px; min-width:0}
+.panel{display:grid; gap:16px; min-width:0}
+
+.step,.card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:18px 20px; display:grid; gap:12px; min-width:0}
+.step-head{display:flex; gap:12px; align-items:baseline}
+.num{font-family:var(--font-mono); font-weight:500; color:var(--accent); font-size:.95rem; min-width:1.2em}
+.help{color:var(--muted); font-size:.9rem; max-width:66ch}
+.hint{color:var(--muted); font-size:.82rem}
+.sub{margin-top:4px}
+
+.axis-grid{display:grid; grid-template-columns:2rem repeat(3, minmax(0,1fr)); gap:8px 10px; align-items:center}
+.axis-grid.three{grid-template-columns:6.4rem repeat(3, minmax(0,1fr))}
+.colhead{font-size:.74rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted)}
+.axl{font-family:var(--font-mono); font-weight:500}
+.rowlabel{font-size:.86rem; color:var(--muted)}
+output{font-family:var(--font-mono); font-size:.88rem; font-variant-numeric:tabular-nums; color:var(--ink); min-width:0; overflow-wrap:anywhere}
+
+input[type="text"],select{
+  font-family:var(--font-mono); font-size:.95rem; font-variant-numeric:tabular-nums;
+  padding:7px 9px; border:1px solid var(--line-strong); border-radius:6px;
+  background:var(--raised); color:var(--ink); width:100%; min-width:0;
+}
+input[type="text"]:disabled,select:disabled{opacity:.6; background:var(--code-bg)}
+input.invalid{border-color:var(--bad); background:var(--bad-soft)}
+input:focus-visible,select:focus-visible,button:focus-visible,canvas:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+input.short{width:6.5rem}
+
+.field{display:grid; gap:6px; min-width:0}
+.field label{font-size:.9rem; font-weight:500}
+.row-fields{display:grid; gap:16px; grid-template-columns:repeat(auto-fit, minmax(14rem,1fr))}
+.inline-helper{display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:.9rem}
+.check{display:flex; gap:10px; align-items:center; font-weight:500}
+.check input{width:18px; height:18px; accent-color:var(--accent)}
+.inline-field{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+.inline-field select{width:auto}
+
+.btn{
+  font-family:var(--font-body); font-weight:500; font-size:.92rem;
+  padding:8px 14px; border-radius:7px; border:1px solid var(--line-strong);
+  background:var(--raised); color:var(--ink); cursor:pointer;
+}
+.btn:hover:not(:disabled){border-color:var(--accent); color:var(--accent)}
+.btn-primary{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.btn-primary:hover:not(:disabled){filter:brightness(1.08); color:var(--accent-ink)}
+.btn:disabled{opacity:.5; cursor:not-allowed}
+.btn-small{padding:4px 10px; font-size:.8rem}
+.chips{display:flex; gap:6px; flex-wrap:wrap}
+.chip{font-family:var(--font-mono); font-size:.82rem; padding:3px 10px; border-radius:999px; border:1px solid var(--line-strong); background:var(--raised); color:var(--ink); cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); color:var(--accent)}
+
+.table-scroll{overflow-x:auto; min-width:0}
+table{width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums}
+th{font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:500; text-align:left; padding:6px 8px; white-space:nowrap}
+td{padding:7px 8px; border-top:1px solid var(--line); font-size:.9rem; vertical-align:middle}
+.stats td{font-family:var(--font-mono); font-size:.85rem; white-space:nowrap}
+.stats td:first-child{font-family:var(--font-body); font-weight:500}
+.stats tbody tr{cursor:pointer}
+.stats tbody tr.sel td{background:var(--accent-soft)}
+.stats tbody tr:hover td{background:var(--accent-soft)}
+.patches td:first-child{font-family:var(--font-mono); font-size:.85rem; white-space:nowrap; color:var(--muted)}
+.patches input,.patches select{font-size:.88rem; padding:5px 8px}
+
+.viewer{position:relative; background:var(--surface); border:1px solid var(--line); border-radius:10px; overflow:hidden}
+.viewer canvas{display:block; width:100%; touch-action:pan-y; cursor:grab}
+.viewer canvas:active{cursor:grabbing}
+.viewer .reset{position:absolute; top:10px; right:10px}
+.caption{padding:0 16px 12px; color:var(--muted); font-size:.84rem}
+
+.card-head{display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between}
+.seg{display:inline-flex; border:1px solid var(--line-strong); border-radius:8px; overflow:hidden}
+.seg button{font-family:var(--font-body); font-size:.86rem; padding:6px 14px; background:var(--raised); color:var(--ink); border:0; border-right:1px solid var(--line); cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button[aria-selected="true"]{background:var(--accent-soft); color:var(--accent); font-weight:600}
+.foot{color:var(--muted); font-size:.82rem}
+
+.notes{display:grid; gap:6px}
+.note{display:flex; gap:10px; align-items:flex-start; padding:8px 10px; border-radius:7px; font-size:.87rem; background:var(--code-bg)}
+.note.warn{background:var(--warn-soft)}
+.note.bad{background:var(--bad-soft)}
+.note.ok{background:var(--ok-soft)}
+.tag{flex:none; font-family:var(--font-mono); font-size:.68rem; text-transform:uppercase; letter-spacing:.05em; padding:2px 6px; border-radius:4px; background:var(--accent); color:var(--bg); margin-top:1px}
+.note.warn .tag{background:var(--warn)}
+.note.bad .tag{background:var(--bad)}
+.note.ok .tag{background:var(--ok)}
+
+pre.dict{font-family:var(--font-mono); font-size:.8rem; line-height:1.45; background:var(--code-bg); border:1px solid var(--line); border-radius:8px; padding:12px 14px; max-height:380px; overflow:auto; white-space:pre; margin:0; color:var(--ink); tab-size:4}
+pre.dict.small{max-height:none}
+.actions{display:flex; flex-wrap:wrap; gap:8px}
+.status{font-size:.86rem; color:var(--accent); min-height:1.3em}
+@media (prefers-reduced-motion: reduce){*{transition:none!important; animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <p class="eyebrow">OpenFOAM · blockMeshDict</p>
+    <h1>blockMesh-generator</h1>
+    <p class="lead">Lag bakgrunnsmeshet til snappyHexMesh og få tre systematisk raffinerte nett til nettuavhengighetsstudien. Fyll inn stegene, se boksen i forhåndsvisningen, og kopier eller last ned blockMeshDict.</p>
+    <p class="example-note">Feltene er fylt ut med eksempelverdier for et flomløp. Bytt dem ut med målene til ditt domene. Det du skriver, huskes i denne nettleseren. Kontroller alltid resultatet med <code>blockMesh</code> og <code>checkMesh</code>.</p>
+  </header>
+
+  <div class="layout">
+    <div class="steps">
+
+      <section class="step" aria-labelledby="h1-domain">
+        <div class="step-head"><span class="num">1</span><h2 id="h1-domain">Domenet</h2></div>
+        <p class="help">Boksen må dekke hele geometrien i STL-fila, med litt margin rundt. Koordinatene er i meter, og fila bruker <code>convertToMeters 1</code>. Desimaler kan skrives med komma eller punktum.</p>
+        <div class="axis-grid">
+          <span></span><span class="colhead">Fra</span><span class="colhead">Til</span><span class="colhead">Lengde</span>
+          <label class="axl" for="min-x">x</label>
+          <input type="text" inputmode="decimal" id="min-x" data-key="min-x" value="0" aria-label="x fra">
+          <input type="text" inputmode="decimal" id="max-x" data-key="max-x" value="12" aria-label="x til">
+          <output id="len-x"></output>
+          <label class="axl" for="min-y">y</label>
+          <input type="text" inputmode="decimal" id="min-y" data-key="min-y" value="0" aria-label="y fra">
+          <input type="text" inputmode="decimal" id="max-y" data-key="max-y" value="2" aria-label="y til">
+          <output id="len-y"></output>
+          <label class="axl" for="min-z">z</label>
+          <input type="text" inputmode="decimal" id="min-z" data-key="min-z" value="0" aria-label="z fra">
+          <input type="text" inputmode="decimal" id="max-z" data-key="max-z" value="4" aria-label="z til">
+          <output id="len-z"></output>
+        </div>
+      </section>
+
+      <section class="step" aria-labelledby="h2-cells">
+        <div class="step-head"><span class="num">2</span><h2 id="h2-cells">Celler i det grove nettet</h2></div>
+        <p class="help">Dette er det grove nettet (nett 3 i GCI). Det middels og det fine nettet regnes ut fra raffineringsfaktoren i steg 3. snappyHexMesh gir best resultat når bakgrunnscellene er omtrent like lange i alle retninger.</p>
+        <div class="axis-grid three">
+          <span></span><span class="colhead">x</span><span class="colhead">y</span><span class="colhead">z</span>
+          <span class="rowlabel">Antall celler</span>
+          <input type="text" inputmode="numeric" id="n-x" data-key="n-x" value="120" aria-label="Antall celler i x">
+          <input type="text" inputmode="numeric" id="n-y" data-key="n-y" value="20" aria-label="Antall celler i y">
+          <input type="text" inputmode="numeric" id="n-z" data-key="n-z" value="40" aria-label="Antall celler i z">
+          <span class="rowlabel">Cellestørrelse</span>
+          <output id="d-x"></output><output id="d-y"></output><output id="d-z"></output>
+        </div>
+        <div class="inline-helper">
+          <label for="delta">Fyll inn kubiske celler med størrelse</label>
+          <input type="text" inputmode="decimal" id="delta" data-key="delta" class="short" value="0,1" aria-describedby="delta-unit">
+          <span id="delta-unit">m</span>
+          <button class="btn" id="apply-delta" type="button">Fyll inn</button>
+        </div>
+      </section>
+
+      <section class="step" aria-labelledby="h3-ref">
+        <div class="step-head"><span class="num">3</span><h2 id="h3-ref">Raffinering</h2></div>
+        <div class="row-fields">
+          <div class="field">
+            <label for="r">Raffineringsfaktor r</label>
+            <input type="text" inputmode="decimal" id="r" data-key="r" value="1,5">
+            <div class="chips" id="r-chips">
+              <button type="button" class="chip" data-r="1.3">1,3</button>
+              <button type="button" class="chip" data-r="1.5">1,5</button>
+              <button type="button" class="chip" data-r="2">2</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="level">Høyeste raffineringsnivå i snappyHexMeshDict</label>
+            <input type="text" inputmode="numeric" id="level" data-key="level" value="3">
+            <p class="hint">Brukes bare til å sjekke locationInMesh i steg 6. Hvert nivå halverer cellene.</p>
+          </div>
+        </div>
+        <p class="help">Det middels nettet får r ganger så mange celler i hver retning som det grove, og det fine r² ganger. Hold raffineringsnivåene i snappyHexMeshDict like på alle tre nettene. Da skaleres hele meshet med samme faktor. Celik et al. (2008) anbefaler r&nbsp;&gt;&nbsp;1,3.</p>
+      </section>
+
+      <section class="step" aria-labelledby="h4-grad">
+        <div class="step-head"><span class="num">4</span><h2 id="h4-grad">2D og grading</h2></div>
+        <label class="check"><input type="checkbox" id="is2d" data-key="is2d"> 2D-simulering</label>
+        <div class="inline-field">
+          <label for="thin">Tykkelsesretning</label>
+          <select id="thin" data-key="thin">
+            <option value="x">x</option>
+            <option value="y" selected>y</option>
+            <option value="z">z</option>
+          </select>
+        </div>
+        <p class="help">I 2D får tykkelsesretningen én celle på alle nettene, og flatene foran og bak blir patchen <code>frontAndBack</code> med type <code>empty</code>. Raffineringen gjelder da bare de to andre retningene.</p>
+
+        <h3 class="sub">Grading (simpleGrading)</h3>
+        <div class="axis-grid three">
+          <span></span><span class="colhead">x</span><span class="colhead">y</span><span class="colhead">z</span>
+          <span class="rowlabel">Forhold</span>
+          <input type="text" inputmode="decimal" id="g-x" data-key="g-x" value="1" aria-label="Grading i x">
+          <input type="text" inputmode="decimal" id="g-y" data-key="g-y" value="1" aria-label="Grading i y">
+          <input type="text" inputmode="decimal" id="g-z" data-key="g-z" value="1" aria-label="Grading i z">
+          <span class="rowlabel">Første celle</span>
+          <output id="gf-x"></output><output id="gf-y"></output><output id="gf-z"></output>
+          <span class="rowlabel">Siste celle</span>
+          <output id="gl-x"></output><output id="gl-y"></output><output id="gl-z"></output>
+        </div>
+        <p class="help">Grading er forholdet mellom siste og første celle i hver retning. 1 gir jevne celler. Over 1 gir større celler mot maks-siden, under 1 gir mindre. Forholdet er det samme på alle tre nettene. Første og siste celle vises for <span class="selname">det fine</span> nettet.</p>
+      </section>
+
+      <section class="step" aria-labelledby="h5-patch">
+        <div class="step-head"><span class="num">5</span><h2 id="h5-patch">Randflater (patcher)</h2></div>
+        <p class="help">Flater med samme navn slås sammen til én patch. Navnene må stemme med det du bruker i <code>0</code>-mappen. Typen <code>empty</code> brukes bare i 2D.</p>
+        <div class="table-scroll">
+          <table class="patches">
+            <thead><tr><th>Flate</th><th>Navn</th><th>Type</th></tr></thead>
+            <tbody id="patch-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="step" aria-labelledby="h6-loc">
+        <div class="step-head"><span class="num">6</span><h2 id="h6-loc">locationInMesh</h2></div>
+        <p class="help">snappyHexMesh beholder den delen av meshet som inneholder dette punktet. Punktet må ligge i vann- eller luftområdet, ikke inne i geometrien, og det må ikke ligge på en celleflate i noen av nettene. Generatoren sjekker det siste. At punktet ligger utenfor geometrien, må du sjekke selv.</p>
+        <div class="axis-grid three">
+          <span></span><span class="colhead">x</span><span class="colhead">y</span><span class="colhead">z</span>
+          <span class="rowlabel">Punkt</span>
+          <input type="text" inputmode="decimal" id="loc-x" data-key="loc-x" value="2" aria-label="locationInMesh x">
+          <input type="text" inputmode="decimal" id="loc-y" data-key="loc-y" value="1" aria-label="locationInMesh y">
+          <input type="text" inputmode="decimal" id="loc-z" data-key="loc-z" value="3" aria-label="locationInMesh z">
+        </div>
+        <div id="loc-status" class="note"></div>
+        <div><button class="btn" id="suggest" type="button">Flytt punktet bort fra celleflatene</button></div>
+        <p class="hint">Knappen flytter punktet så lite som mulig, slik at det ligger godt inne i en celle på alle tre nettene, også etter raffinering til nivået i steg 3.</p>
+      </section>
+    </div>
+
+    <aside class="panel" aria-label="Forhåndsvisning og resultat">
+      <div class="viewer">
+        <canvas id="cv" tabindex="0" aria-label="Forhåndsvisning av boksen i 3D. Dra eller bruk piltastene for å rotere."></canvas>
+        <button class="btn btn-small reset" id="reset-view" type="button">Tilbakestill visning</button>
+        <p class="caption" id="cv-caption"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Nettene</h2>
+          <div class="seg" role="tablist" aria-label="Velg nett" id="tabs">
+            <button type="button" role="tab" data-i="0">Grovt</button>
+            <button type="button" role="tab" data-i="1">Middels</button>
+            <button type="button" role="tab" data-i="2">Fint</button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="stats">
+            <thead><tr><th>Nett</th><th>GCI</th><th>Celler</th><th>Totalt</th><th>h</th><th>r</th><th>Minne*</th></tr></thead>
+            <tbody id="stats-body"></tbody>
+          </table>
+        </div>
+        <p class="foot">Celletallene gjelder bakgrunnsmeshet fra blockMesh, før snappyHexMesh legger til celler. GCI-indeksen følger Celik et al. (2008), der 1 er det fineste nettet. h er gjennomsnittlig cellestørrelse fra ligning (1). Når meshet er ferdig, bruker du celletallet fra <code>checkMesh</code> til GCI-beregningen. *Grovt anslag for interFoam, omtrent 1 GB per million celler.</p>
+        <div class="notes" id="notes"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>blockMeshDict · <span id="dict-name">fint nett</span></h2></div>
+        <pre class="dict" id="dict" tabindex="0" aria-label="Innholdet i blockMeshDict"></pre>
+        <div class="actions">
+          <button class="btn btn-primary" id="copy" type="button">Kopier</button>
+          <button class="btn" id="dl-one" type="button" disabled>Last ned denne</button>
+          <button class="btn" id="dl-zip" type="button" disabled>Last ned alle tre (.zip)</button>
+        </div>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+        <p class="foot" id="dl-note">Zip-fila inneholder <code>grov/system/blockMeshDict</code>, <code>middels/system/blockMeshDict</code> og <code>fin/system/blockMeshDict</code>, pluss en LESMEG.txt med celletall og locationInMesh. «Last ned denne» lagrer fila som <code>blockMeshDict</code> for nettet som er valgt.</p>
+      </div>
+
+      <div class="card">
+        <h2>Neste steg i terminalen</h2>
+        <p class="help">Kjør dette i case-mappen til hvert nett. Kopier gjerne basiscaset til tre mapper først, så du ikke overskriver noe.</p>
+        <pre class="dict small" id="cmds"></pre>
+        <div><button class="btn" id="copy-cmds" type="button">Kopier kommandoene</button></div>
+        <p class="foot">Fila bruker variablene <code>nx</code>, <code>ny</code> og <code>nz</code>. Du kan derfor også endre celletallet i et case direkte, for eksempel med <code>foamDictionary -entry nx -set 180 system/blockMeshDict</code>.</p>
+      </div>
+    </aside>
+  </div>
+  <footer class="foot site-foot"><a href="https://github.com/eilivvole01/blockmesh-generator">Kildekode på GitHub</a></footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const AX = ["x", "y", "z"];
+  const MESHES = [
+    { key: "grov", label: "Grovt", gci: "3", noun: "det grove" },
+    { key: "middels", label: "Middels", gci: "2", noun: "det middels" },
+    { key: "fin", label: "Fint", gci: "1", noun: "det fine" }
+  ];
+  const FACES = {
+    xmin: { label: "x min", axis: "x", verts: [0, 4, 7, 3], n: [-1, 0, 0] },
+    xmax: { label: "x maks", axis: "x", verts: [2, 6, 5, 1], n: [1, 0, 0] },
+    ymin: { label: "y min", axis: "y", verts: [1, 5, 4, 0], n: [0, -1, 0] },
+    ymax: { label: "y maks", axis: "y", verts: [3, 7, 6, 2], n: [0, 1, 0] },
+    zmin: { label: "z min", axis: "z", verts: [0, 3, 2, 1], n: [0, 0, -1] },
+    zmax: { label: "z maks", axis: "z", verts: [4, 5, 6, 7], n: [0, 0, 1] }
+  };
+  const FACE_ORDER = ["xmin", "xmax", "ymin", "ymax", "zmin", "zmax"];
+  const PATCH_DEFAULTS = {
+    xmin: ["inlet", "patch"], xmax: ["outlet", "patch"],
+    ymin: ["sides", "wall"], ymax: ["sides", "wall"],
+    zmin: ["bottom", "wall"], zmax: ["atmosphere", "patch"]
+  };
+  const PATCH_TYPES = ["patch", "wall", "symmetryPlane", "empty"];
+  const STORE = "blockmesh-generator-v1";
+
+  // ---------- build patch rows ----------
+  const pb = $("patch-body");
+  for (const f of FACE_ORDER) {
+    const tr = document.createElement("tr");
+    const td0 = document.createElement("td"); td0.textContent = FACES[f].label;
+    const td1 = document.createElement("td");
+    const inp = document.createElement("input");
+    inp.type = "text"; inp.id = "pn-" + f; inp.dataset.key = "pn-" + f; inp.value = PATCH_DEFAULTS[f][0];
+    inp.setAttribute("aria-label", "Patchnavn for " + FACES[f].label); inp.spellcheck = false;
+    td1.appendChild(inp);
+    const td2 = document.createElement("td");
+    const sel = document.createElement("select");
+    sel.id = "pt-" + f; sel.dataset.key = "pt-" + f; sel.setAttribute("aria-label", "Patchtype for " + FACES[f].label);
+    for (const t of PATCH_TYPES) { const o = document.createElement("option"); o.value = t; o.textContent = t; sel.appendChild(o); }
+    sel.value = PATCH_DEFAULTS[f][1];
+    td2.appendChild(sel);
+    tr.append(td0, td1, td2);
+    pb.appendChild(tr);
+  }
+
+  // ---------- state persistence ----------
+  let sel = 2;
+  const keyed = () => Array.from(document.querySelectorAll("[data-key]"));
+  function save() {
+    const data = { sel };
+    for (const el of keyed()) {
+      if (el.type === "checkbox") data[el.dataset.key] = el.checked;
+      else data[el.dataset.key] = (el.disabled && el.dataset.prev != null) ? el.dataset.prev : el.value;
+    }
+    try { localStorage.setItem(STORE, JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
+  }
+  function load() {
+    let data = null;
+    try { const raw = localStorage.getItem(STORE); if (raw) data = JSON.parse(raw); } catch (e) { data = null; }
+    if (!data) return;
+    for (const el of keyed()) {
+      const v = data[el.dataset.key];
+      if (v === undefined) continue;
+      if (el.type === "checkbox") el.checked = !!v; else el.value = v;
+    }
+    if (Number.isInteger(data.sel) && data.sel >= 0 && data.sel <= 2) sel = data.sel;
+  }
+
+  // ---------- helpers ----------
+  function parseNum(s) {
+    if (s == null) return NaN;
+    const t = String(s).trim().replace(/\s/g, "").replace(",", ".");
+    if (t === "" || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(t)) return NaN;
+    return Number(t);
+  }
+  const nb = (v, d) => v.toLocaleString("nb-NO", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const nint = (v) => v.toLocaleString("nb-NO");
+  function fmtLen(m) {
+    if (!isFinite(m)) return "–";
+    const a = Math.abs(m);
+    if (a >= 1) return nb(m, a >= 100 ? 1 : 2) + " m";
+    const mm = m * 1000;
+    const am = Math.abs(mm);
+    return nb(mm, am >= 100 ? 0 : am >= 10 ? 1 : 2) + " mm";
+  }
+  function fd(v) { // number for the dictionary (dot decimals, no float noise)
+    if (!isFinite(v)) return "0";
+    const r = Number(v.toPrecision(12));
+    return Object.is(r, -0) ? "0" : String(r);
+  }
+  function lock(el, val, on) {
+    if (on) {
+      if (!el.disabled) el.dataset.prev = el.value;
+      el.value = val; el.disabled = true;
+    } else if (el.disabled) {
+      if (el.dataset.prev != null) el.value = el.dataset.prev;
+      delete el.dataset.prev; el.disabled = false;
+    }
+  }
+  function apply2D() {
+    const is2D = $("is2d").checked, thin = $("thin").value;
+    $("thin").disabled = !is2D;
+    for (const a of AX) {
+      const on = is2D && a === thin;
+      lock($("n-" + a), "1", on);
+      lock($("g-" + a), "1", on);
+    }
+    for (const f of FACE_ORDER) {
+      const on = is2D && FACES[f].axis === thin;
+      lock($("pn-" + f), "frontAndBack", on);
+      lock($("pt-" + f), "empty", on);
+    }
+  }
+
+  // ---------- model ----------
+  function readModel() {
+    const errors = [], bad = new Set();
+    const m = { min: {}, max: {}, L: {}, n: {}, g: {}, loc: {} };
+    m.is2D = $("is2d").checked; m.thin = $("thin").value;
+    for (const a of AX) {
+      m.min[a] = parseNum($("min-" + a).value);
+      m.max[a] = parseNum($("max-" + a).value);
+      if (!isFinite(m.min[a])) { bad.add("min-" + a); errors.push(`Skriv inn et tall for ${a} fra.`); }
+      if (!isFinite(m.max[a])) { bad.add("max-" + a); errors.push(`Skriv inn et tall for ${a} til.`); }
+      if (isFinite(m.min[a]) && isFinite(m.max[a]) && m.max[a] <= m.min[a]) {
+        bad.add("max-" + a); errors.push(`${a} til må være større enn ${a} fra.`);
+      }
+      m.L[a] = m.max[a] - m.min[a];
+      const n = parseNum($("n-" + a).value);
+      if (!isFinite(n) || n < 1 || Math.abs(n - Math.round(n)) > 1e-9) {
+        bad.add("n-" + a); errors.push(`Antall celler i ${a} må være et helt tall, minst 1.`);
+      }
+      m.n[a] = Math.round(n);
+      const g = parseNum($("g-" + a).value);
+      if (!isFinite(g) || g <= 0) { bad.add("g-" + a); errors.push(`Grading i ${a} må være et tall større enn 0.`); }
+      m.g[a] = g;
+      m.loc[a] = parseNum($("loc-" + a).value);
+      if (!isFinite(m.loc[a])) bad.add("loc-" + a);
+    }
+    m.r = parseNum($("r").value);
+    if (!isFinite(m.r) || m.r <= 1) { bad.add("r"); errors.push("Raffineringsfaktoren r må være større enn 1."); }
+    m.level = parseNum($("level").value);
+    if (!isFinite(m.level) || m.level < 0 || m.level > 10 || m.level !== Math.round(m.level)) {
+      bad.add("level"); errors.push("Raffineringsnivået må være et helt tall fra 0 til 10."); m.level = 0;
+    }
+    m.patches = {};
+    for (const f of FACE_ORDER) {
+      const name = $("pn-" + f).value.trim(), type = $("pt-" + f).value;
+      m.patches[f] = { name, type };
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+        bad.add("pn-" + f);
+        errors.push(`Patchnavnet for ${FACES[f].label} kan bare inneholde bokstaver (a–z), tall og _, og kan ikke starte med et tall.`);
+      }
+    }
+    // patch groups
+    m.groups = [];
+    const byName = new Map();
+    for (const f of FACE_ORDER) {
+      const p = m.patches[f];
+      if (!byName.has(p.name)) { const g = { name: p.name, type: p.type, faces: [f] }; byName.set(p.name, g); m.groups.push(g); }
+      else {
+        const g = byName.get(p.name); g.faces.push(f);
+        if (g.type !== p.type) { bad.add("pt-" + f); errors.push(`Patchen «${p.name}» har ulike typer på flatene. Gi flatene samme type eller ulike navn.`); }
+      }
+    }
+    return { m, errors, bad };
+  }
+
+  function gridLines(lo, L, n, R) {
+    const p = new Array(n + 1);
+    p[0] = lo;
+    if (n === 1 || Math.abs(R - 1) < 1e-12) { for (let i = 1; i <= n; i++) p[i] = lo + L * i / n; return p; }
+    const q = Math.pow(R, 1 / (n - 1));
+    const d1 = L * (q - 1) / (Math.pow(q, n) - 1);
+    let x = lo, d = d1;
+    for (let i = 1; i <= n; i++) { x += d; p[i] = x; d *= q; }
+    p[n] = lo + L;
+    return p;
+  }
+  function firstLast(L, n, R) {
+    if (n === 1 || Math.abs(R - 1) < 1e-12) return [L / n, L / n];
+    const q = Math.pow(R, 1 / (n - 1));
+    const d1 = L * (q - 1) / (Math.pow(q, n) - 1);
+    return [d1, d1 * Math.pow(q, n - 1)];
+  }
+  function computeMeshes(m) {
+    const inplane = m.is2D ? AX.filter(a => a !== m.thin) : AX;
+    return MESHES.map((M, k) => {
+      const f = Math.pow(m.r, k), n = {};
+      for (const a of AX) n[a] = (m.is2D && a === m.thin) ? 1 : Math.max(1, Math.round(m.n[a] * f));
+      const N = n.x * n.y * n.z;
+      let h;
+      if (m.is2D) h = Math.sqrt(m.L[inplane[0]] * m.L[inplane[1]] / (n[inplane[0]] * n[inplane[1]]));
+      else h = Math.cbrt(m.L.x * m.L.y * m.L.z / N);
+      return Object.assign({ k, n, N, h }, M);
+    });
+  }
+  function pointRatio(c, lines, level) {
+    const lo = lines[0], hi = lines[lines.length - 1];
+    if (!(c > lo && c < hi)) return -1;
+    let a = 0, b = lines.length - 1;
+    while (b - a > 1) { const mid = (a + b) >> 1; if (lines[mid] <= c) a = mid; else b = mid; }
+    const sub = (lines[b] - lines[a]) / Math.pow(2, level);
+    const t = (c - lines[a]) / sub;
+    const frac = t - Math.floor(t);
+    return Math.min(frac, 1 - frac);
+  }
+  function locCheck(m, meshes) {
+    // returns per-mesh min ratio and overall
+    const res = meshes.map(M => {
+      let worst = Infinity, worstAx = null;
+      for (const a of AX) {
+        const lines = gridLines(m.min[a], m.L[a], M.n[a], m.g[a]);
+        const r = pointRatio(m.loc[a], lines, m.level);
+        if (r < worst) { worst = r; worstAx = a; }
+      }
+      return { worst, worstAx };
+    });
+    const overall = Math.min(...res.map(r => r.worst));
+    return { res, overall };
+  }
+  function suggestCoord(a, m, meshes) {
+    const lo = m.min[a], L = m.L[a];
+    const linesPer = meshes.map(M => gridLines(lo, L, M.n[a], m.g[a]));
+    let cur = isFinite(m.loc[a]) ? m.loc[a] : lo + L / 2;
+    cur = Math.min(Math.max(cur, lo + 0.02 * L), lo + 0.98 * L);
+    const N = 24000, cands = [];
+    for (let i = 0; i <= N; i++) {
+      const c = lo + L * (0.02 + 0.96 * i / N);
+      let s = Infinity;
+      for (const lines of linesPer) { const r = pointRatio(c, lines, m.level); if (r < s) s = r; }
+      cands.push({ c, s, d: Math.abs(c - cur) });
+    }
+    // keep current value if already fine
+    let curScore = Infinity;
+    for (const lines of linesPer) { const r = pointRatio(cur, lines, m.level); if (r < curScore) curScore = r; }
+    if (curScore >= 0.25 && isFinite(m.loc[a]) && cur === m.loc[a]) return m.loc[a];
+    cands.sort((p, q) => p.d - q.d);
+    let pick = cands.find(c => c.s >= 0.3);
+    if (!pick) pick = cands.reduce((b, c) => (c.s > b.s ? c : b), cands[0]);
+    // round to a tidy value that still scores well
+    for (const dec of [3, 4, 5, 6]) {
+      const v = Number(pick.c.toFixed(dec));
+      let s = Infinity;
+      for (const lines of linesPer) { const r = pointRatio(v, lines, m.level); if (r < s) s = r; }
+      if (s >= 0.2) return v;
+    }
+    return Number(pick.c.toFixed(6));
+  }
+
+  // ---------- dictionary text ----------
+  function verts(m) {
+    const a = m.min, b = m.max;
+    return [
+      [a.x, a.y, a.z], [b.x, a.y, a.z], [b.x, b.y, a.z], [a.x, b.y, a.z],
+      [a.x, a.y, b.z], [b.x, a.y, b.z], [b.x, b.y, b.z], [a.x, b.y, b.z]
+    ];
+  }
+  function locText(m) { return `(${fd(m.loc.x)} ${fd(m.loc.y)} ${fd(m.loc.z)})`; }
+  function makeDict(m, meshes, M) {
+    const V = verts(m);
+    const lines = [];
+    lines.push("FoamFile");
+    lines.push("{");
+    lines.push("    version     2.0;");
+    lines.push("    format      ascii;");
+    lines.push("    class       dictionary;");
+    lines.push("    object      blockMeshDict;");
+    lines.push("}");
+    lines.push("");
+    lines.push(`// Laget med blockMesh-generator`);
+    lines.push(`// Nett: ${M.key} (nett ${M.gci} i GCI), raffineringsfaktor r = ${fd(m.r)}${m.is2D ? ", 2D (tykkelse i " + m.thin + ")" : ""}`);
+    lines.push(`// Bakgrunnsceller: ${M.n.x} x ${M.n.y} x ${M.n.z} = ${M.N} (før snappyHexMesh)`);
+    lines.push(`// locationInMesh til snappyHexMeshDict: ${locText(m)}`);
+    lines.push("");
+    lines.push("convertToMeters 1;");
+    lines.push("");
+    lines.push(`nx ${M.n.x};`);
+    lines.push(`ny ${M.n.y};`);
+    lines.push(`nz ${M.n.z};`);
+    lines.push("");
+    lines.push("vertices");
+    lines.push("(");
+    V.forEach((v, i) => lines.push(`    (${fd(v[0])} ${fd(v[1])} ${fd(v[2])})    // ${i}`));
+    lines.push(");");
+    lines.push("");
+    lines.push("blocks");
+    lines.push("(");
+    lines.push(`    hex (0 1 2 3 4 5 6 7) ($nx $ny $nz) simpleGrading (${fd(m.g.x)} ${fd(m.g.y)} ${fd(m.g.z)})`);
+    lines.push(");");
+    lines.push("");
+    lines.push("edges");
+    lines.push("(");
+    lines.push(");");
+    lines.push("");
+    lines.push("boundary");
+    lines.push("(");
+    for (const g of m.groups) {
+      lines.push(`    ${g.name}`);
+      lines.push("    {");
+      lines.push(`        type ${g.type};`);
+      lines.push("        faces");
+      lines.push("        (");
+      for (const f of g.faces) lines.push(`            (${FACES[f].verts.join(" ")})    // ${FACES[f].label}`);
+      lines.push("        );");
+      lines.push("    }");
+    }
+    lines.push(");");
+    lines.push("");
+    lines.push("mergePatchPairs");
+    lines.push("(");
+    lines.push(");");
+    lines.push("");
+    lines.push("// ************************************************************************* //");
+    return lines.join("\n") + "\n";
+  }
+  function makeReadme(m, meshes) {
+    const out = [];
+    out.push("blockMesh-generator: tre nett for nettuavhengighetsstudie");
+    out.push("");
+    out.push(`Raffineringsfaktor (mål): r = ${fd(m.r)}${m.is2D ? "   (2D, tykkelse i " + m.thin + "-retning)" : ""}`);
+    out.push("");
+    meshes.forEach((M, i) => {
+      let rtxt = "";
+      if (i > 0) rtxt = `, r${i === 1 ? "32" : "21"} = ${(meshes[i - 1].h / M.h).toFixed(3)}`;
+      out.push(`  ${M.key.padEnd(8)}(nett ${M.gci}): ${M.n.x} x ${M.n.y} x ${M.n.z} = ${M.N} celler, h = ${M.h.toPrecision(4)} m${rtxt}`);
+    });
+    out.push("");
+    out.push("Celletallene gjelder bakgrunnsmeshet fra blockMesh. snappyHexMesh legger til celler,");
+    out.push("så bruk antall celler fra checkMesh når du regner ut h og r til GCI.");
+    out.push("");
+    out.push("locationInMesh (samme i alle tre snappyHexMeshDict):");
+    out.push("  " + locText(m));
+    out.push("");
+    out.push("Slik bruker du filene:");
+    out.push("  1. Kopier basiscaset til tre mapper, for eksempel case_grov, case_middels og case_fin.");
+    out.push("  2. Legg grov/system/blockMeshDict i case_grov/system/, og tilsvarende for de andre.");
+    out.push("  3. Hold raffineringsnivåene i snappyHexMeshDict like i alle tre casene.");
+    out.push("  4. Kjør i hver mappe:");
+    out.push("       blockMesh");
+    out.push("       surfaceFeatureExtract      (heter surfaceFeatures i OpenFOAM.org)");
+    out.push("       snappyHexMesh -overwrite");
+    out.push("       checkMesh");
+    out.push("");
+    return out.join("\n");
+  }
+  const CMDS = [
+    "blockMesh",
+    "surfaceFeatureExtract      # surfaceFeatures i OpenFOAM.org",
+    "snappyHexMesh -overwrite",
+    "checkMesh | tee log.checkMesh",
+    "grep \"cells:\" log.checkMesh"
+  ].join("\n");
+
+  // ---------- rendering ----------
+  let current = null; // {m, errors, meshes}
+
+  function setNotes(list) {
+    const box = $("notes");
+    box.textContent = "";
+    for (const n of list) {
+      const d = document.createElement("div");
+      d.className = "note " + (n.kind || "");
+      const t = document.createElement("span"); t.className = "tag";
+      t.textContent = n.kind === "bad" ? "Feil" : n.kind === "warn" ? "Sjekk" : n.kind === "ok" ? "OK" : "Info";
+      const s = document.createElement("span"); s.textContent = n.text;
+      d.append(t, s); box.appendChild(d);
+    }
+  }
+
+  function render() {
+    apply2D();
+    const { m, errors, bad } = readModel();
+    for (const el of keyed()) if (el.tagName === "INPUT" && el.type === "text") el.classList.toggle("invalid", bad.has(el.id));
+    for (const f of FACE_ORDER) $("pt-" + f).classList.toggle("invalid", bad.has("pt-" + f));
+
+    const valid = errors.length === 0;
+    const meshes = valid ? computeMeshes(m) : null;
+    current = { m, errors, meshes, valid };
+
+    // step outputs
+    for (const a of AX) {
+      $("len-" + a).textContent = isFinite(m.L[a]) && m.L[a] > 0 ? fmtLen(m.L[a]) : "–";
+      $("d-" + a).textContent = (isFinite(m.L[a]) && m.L[a] > 0 && m.n[a] >= 1) ? fmtLen(m.L[a] / m.n[a]) : "–";
+    }
+    // r chips
+    for (const c of document.querySelectorAll("#r-chips .chip")) c.setAttribute("aria-pressed", String(isFinite(m.r) && Math.abs(parseFloat(c.dataset.r) - m.r) < 1e-9));
+    // tabs
+    for (const b of document.querySelectorAll("#tabs button")) b.setAttribute("aria-selected", String(+b.dataset.i === sel));
+    for (const s of document.querySelectorAll(".selname")) s.textContent = MESHES[sel].noun;
+    $("dict-name").textContent = MESHES[sel].label.toLowerCase() + " nett";
+
+    const notes = [];
+    const statsBody = $("stats-body");
+    statsBody.textContent = "";
+
+    if (!valid) {
+      for (const e of Array.from(new Set(errors))) notes.push({ kind: "bad", text: e });
+      setNotes(notes);
+      $("dict").textContent = "Rett opp feilene markert i rødt, så vises blockMeshDict her.";
+      for (const a of AX) { $("gf-" + a).textContent = "–"; $("gl-" + a).textContent = "–"; }
+      setLocStatus(null, m);
+      updateButtons();
+      draw();
+      save();
+      return;
+    }
+
+    // grading first/last for selected mesh
+    const S = meshes[sel];
+    for (const a of AX) {
+      const [f1, l1] = firstLast(m.L[a], S.n[a], m.g[a]);
+      $("gf-" + a).textContent = fmtLen(f1);
+      $("gl-" + a).textContent = fmtLen(l1);
+    }
+
+    // stats table
+    meshes.forEach((M, i) => {
+      const tr = document.createElement("tr");
+      if (i === sel) tr.className = "sel";
+      tr.dataset.i = i;
+      tr.tabIndex = 0;
+      const rTxt = i === 0 ? "–" : `r${i === 1 ? "₃₂" : "₂₁"} = ${nb(meshes[i - 1].h / M.h, 2)}`;
+      const mem = M.N / 1e6;
+      const cells = [M.label, M.gci, `${M.n.x} × ${M.n.y} × ${M.n.z}`, nint(M.N), fmtLen(M.h), rTxt, mem < 0.1 ? "< 0,1 GB" : "≈ " + nb(mem, mem < 10 ? 1 : 0) + " GB"];
+      for (const c of cells) { const td = document.createElement("td"); td.textContent = c; tr.appendChild(td); }
+      tr.addEventListener("click", () => selectMesh(i));
+      tr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectMesh(i); } });
+      statsBody.appendChild(tr);
+    });
+
+    // notes
+    if (m.r < 1.3) notes.push({ kind: "warn", text: `r = ${nb(m.r, 2)} er under 1,3, som Celik et al. (2008) anbefaler som minimum. Forskjellen mellom nettene kan bli for liten til å skille fra støy.` });
+    const rReal = [meshes[0].h / meshes[1].h, meshes[1].h / meshes[2].h];
+    if (rReal.some(r => Math.abs(r - m.r) / m.r > 0.03)) {
+      notes.push({ kind: "info", text: `Celletallene rundes av til hele tall, så faktisk r blir ${nb(rReal[0], 2)} og ${nb(rReal[1], 2)}. Ligning (3) håndterer ulik r, men da må p løses iterativt.` });
+    }
+    const act = m.is2D ? AX.filter(a => a !== m.thin) : AX;
+    const ds = act.map(a => m.L[a] / m.n[a]);
+    const ar = Math.max(...ds) / Math.min(...ds);
+    if (ar > 2) notes.push({ kind: "warn", text: `Cellene i det grove nettet har sideforhold ${nb(ar, 1)}. snappyHexMesh fungerer best med omtrent kubiske bakgrunnsceller. Bruk «Fyll inn» i steg 2.` });
+    if (act.some(a => Math.abs(m.g[a] - 1) > 1e-12)) notes.push({ kind: "info", text: "Med grading varierer cellestørrelsen. h i tabellen er gjennomsnittet, slik som i ligning (1)." });
+    if (meshes[2].N > 5e6) notes.push({ kind: "warn", text: `Det fine nettet har ${nint(meshes[2].N)} bakgrunnsceller før snappyHexMesh. Sjekk at maskinen har nok minne.` });
+    if (!m.is2D && FACE_ORDER.some(f => m.patches[f].type === "empty")) notes.push({ kind: "warn", text: "Typen empty brukes bare i 2D. I 3D bør flaten være patch, wall eller symmetryPlane." });
+    if (m.is2D && m.n[m.thin] !== 1) { /* thin is forced to 1 */ }
+
+    const lc = locCheck(m, meshes);
+    setLocStatus(lc, m, meshes);
+    if (lc.overall < 0) notes.push({ kind: "bad", text: "locationInMesh ligger utenfor eller på kanten av boksen. Se steg 6." });
+    else if (lc.overall < 0.1) notes.push({ kind: "warn", text: "locationInMesh ligger nær en celleflate i minst ett av nettene. Se steg 6." });
+
+    if (notes.length === 0) notes.push({ kind: "ok", text: "Alle tre nettene ser fornuftige ut." });
+    setNotes(notes);
+
+    $("dict").textContent = makeDict(m, meshes, S);
+    updateButtons();
+    draw();
+    save();
+  }
+
+  function setLocStatus(lc, m, meshes) {
+    const box = $("loc-status");
+    box.className = "note";
+    box.textContent = "";
+    const tag = document.createElement("span"); tag.className = "tag";
+    const txt = document.createElement("span");
+    if (!lc) {
+      const okNums = AX.every(a => isFinite(m.loc[a]));
+      tag.textContent = okNums ? "Info" : "Feil";
+      if (!okNums) box.classList.add("bad");
+      txt.textContent = okNums ? "Punktet sjekkes når resten av feltene er gyldige." : "Skriv inn tre tall for punktet.";
+      $("suggest").disabled = true;
+      box.append(tag, txt); return;
+    }
+    $("suggest").disabled = false;
+    if (lc.overall < 0) {
+      box.classList.add("bad"); tag.textContent = "Feil";
+      txt.textContent = "Punktet ligger utenfor eller på kanten av boksen. Flytt det inn i domenet.";
+    } else {
+      const parts = meshes.map((M, i) => `${M.label.toLowerCase()} ${nb(lc.res[i].worst * 100, 0)} %`);
+      const ok = lc.overall >= 0.1;
+      box.classList.add(ok ? "ok" : "warn"); tag.textContent = ok ? "OK" : "Sjekk";
+      txt.textContent = (ok ? "Punktet ligger godt inne i en celle på alle nettene. " : "Punktet ligger for nær en celleflate. Bruk knappen under. ")
+        + `Minste avstand til en celleflate, i prosent av cellestørrelsen etter nivå ${m.level}: ${parts.join(", ")}.`;
+    }
+    box.append(tag, txt);
+  }
+
+  function selectMesh(i) { sel = i; render(); }
+
+  // ---------- 3D preview ----------
+  const view = { yaw: -0.62, elev: 0.42 };
+  const cv = $("cv");
+  function colors() {
+    const cs = getComputedStyle(document.documentElement);
+    const g = (n) => cs.getPropertyValue(n).trim();
+    return { grid: g("--grid"), face: g("--face"), ink: g("--ink"), muted: g("--muted"), accent: g("--accent"), strong: g("--line-strong"), surface: g("--surface"), bad: g("--bad") };
+  }
+  let rafPending = false;
+  function draw() {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(() => { rafPending = false; drawNow(); });
+  }
+  function drawNow() {
+    const wrap = cv.parentElement;
+    const w = Math.max(200, wrap.clientWidth);
+    const h = Math.round(Math.min(Math.max(w * 0.66, 240), 440));
+    const dpr = window.devicePixelRatio || 1;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    cv.style.height = h + "px";
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const col = colors();
+    const cap = $("cv-caption");
+
+    if (!current || !current.valid) {
+      ctx.fillStyle = col.muted; ctx.font = "14px " + getComputedStyle(document.body).fontFamily;
+      ctx.textAlign = "center"; ctx.fillText("Rett opp feilene for å se boksen.", w / 2, h / 2);
+      cap.textContent = "";
+      return;
+    }
+    const { m, meshes } = current;
+    const M = meshes[sel];
+    const S = 1 / Math.max(m.L.x, m.L.y, m.L.z);
+    const c = { x: (m.min.x + m.max.x) / 2, y: (m.min.y + m.max.y) / 2, z: (m.min.z + m.max.z) / 2 };
+    const cy = Math.cos(view.yaw), sy = Math.sin(view.yaw), ce = Math.cos(view.elev), se = Math.sin(view.elev);
+    const proj = (x, y, z) => {
+      const X = (x - c.x) * S, Y = (y - c.y) * S, Z = (z - c.z) * S;
+      const sx = X * cy - Y * sy, d0 = X * sy + Y * cy;
+      return { sx, sy: -(Z * ce + d0 * se) };
+    };
+    const V = verts(m);
+    const P0 = V.map(v => proj(v[0], v[1], v[2]));
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of P0) { minX = Math.min(minX, p.sx); maxX = Math.max(maxX, p.sx); minY = Math.min(minY, p.sy); maxY = Math.max(maxY, p.sy); }
+    const pad = 46;
+    const k = Math.min((w - 2 * pad) / Math.max(maxX - minX, 1e-9), (h - 2 * pad) / Math.max(maxY - minY, 1e-9));
+    const ox = w / 2 - k * (minX + maxX) / 2, oy = h / 2 - k * (minY + maxY) / 2;
+    const T = (x, y, z) => { const p = proj(x, y, z); return [ox + p.sx * k, oy + p.sy * k]; };
+    const PT = V.map(v => T(v[0], v[1], v[2]));
+
+    const visible = {};
+    for (const f of FACE_ORDER) {
+      const n = FACES[f].n;
+      const dn = (n[0] * sy + n[1] * cy) * ce - n[2] * se;
+      visible[f] = dn < -1e-9;
+    }
+    const EDGES = [
+      [0, 1, "ymin", "zmin"], [3, 2, "ymax", "zmin"], [4, 5, "ymin", "zmax"], [7, 6, "ymax", "zmax"],
+      [0, 3, "xmin", "zmin"], [1, 2, "xmax", "zmin"], [4, 7, "xmin", "zmax"], [5, 6, "xmax", "zmax"],
+      [0, 4, "xmin", "ymin"], [1, 5, "xmax", "ymin"], [2, 6, "xmax", "ymax"], [3, 7, "xmin", "ymax"]
+    ];
+
+    // hidden edges
+    ctx.save();
+    ctx.setLineDash([4, 4]); ctx.lineWidth = 1; ctx.strokeStyle = col.strong;
+    for (const e of EDGES) if (!visible[e[2]] && !visible[e[3]]) { ctx.beginPath(); ctx.moveTo(...PT[e[0]]); ctx.lineTo(...PT[e[1]]); ctx.stroke(); }
+    ctx.restore();
+
+    // faces + grid
+    let decimated = 1;
+    const lineCache = {};
+    for (const a of AX) lineCache[a] = gridLines(m.min[a], m.L[a], M.n[a], m.g[a]);
+    for (const f of FACE_ORDER) {
+      if (!visible[f]) continue;
+      const vs = FACES[f].verts;
+      ctx.beginPath(); ctx.moveTo(...PT[vs[0]]); for (let i = 1; i < 4; i++) ctx.lineTo(...PT[vs[i]]); ctx.closePath();
+      ctx.fillStyle = col.face; ctx.globalAlpha = 0.85; ctx.fill(); ctx.globalAlpha = 1;
+
+      const a = FACES[f].axis;
+      const fixed = f.endsWith("min") ? m.min[a] : m.max[a];
+      const others = AX.filter(q => q !== a);
+      ctx.strokeStyle = col.grid; ctx.lineWidth = 0.7;
+      for (let oi = 0; oi < 2; oi++) {
+        const b = others[oi], cc = others[1 - oi];
+        const lines = lineCache[b];
+        const step = Math.max(1, Math.ceil((lines.length - 1) / 70));
+        if (step > decimated) decimated = step;
+        ctx.beginPath();
+        for (let i = 1; i < lines.length - 1; i += step) {
+          const p1 = {}, p2 = {};
+          p1[a] = fixed; p2[a] = fixed; p1[b] = lines[i]; p2[b] = lines[i]; p1[cc] = m.min[cc]; p2[cc] = m.max[cc];
+          ctx.moveTo(...T(p1.x, p1.y, p1.z)); ctx.lineTo(...T(p2.x, p2.y, p2.z));
+        }
+        ctx.stroke();
+      }
+    }
+    // visible edges
+    ctx.strokeStyle = col.ink; ctx.lineWidth = 1.4;
+    for (const e of EDGES) if (visible[e[2]] || visible[e[3]]) { ctx.beginPath(); ctx.moveTo(...PT[e[0]]); ctx.lineTo(...PT[e[1]]); ctx.stroke(); }
+
+    // patch labels on visible faces
+    const fam = getComputedStyle(document.body).getPropertyValue("--font-mono") || "monospace";
+    ctx.font = "500 11px " + fam; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (const f of FACE_ORDER) {
+      if (!visible[f]) continue;
+      const vs = FACES[f].verts;
+      let sx = 0, syy = 0; for (const v of vs) { sx += PT[v][0]; syy += PT[v][1]; }
+      sx /= 4; syy /= 4;
+      const label = m.patches[f].name || "?";
+      ctx.lineWidth = 3; ctx.strokeStyle = col.surface; ctx.strokeText(label, sx, syy);
+      ctx.fillStyle = col.muted; ctx.fillText(label, sx, syy);
+    }
+
+    // locationInMesh
+    const L = m.loc;
+    if (AX.every(a => isFinite(L[a]))) {
+      const inside = AX.every(a => L[a] > m.min[a] && L[a] < m.max[a]);
+      const p = T(L.x, L.y, L.z);
+      if (inside) {
+        const foot = T(L.x, L.y, m.min.z);
+        ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = col.accent; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(...p); ctx.lineTo(...foot); ctx.stroke(); ctx.restore();
+        ctx.strokeStyle = col.accent; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(foot[0] - 4, foot[1]); ctx.lineTo(foot[0] + 4, foot[1]); ctx.moveTo(foot[0], foot[1] - 3); ctx.lineTo(foot[0], foot[1] + 3); ctx.stroke();
+      }
+      ctx.beginPath(); ctx.arc(p[0], p[1], 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = inside ? col.accent : col.bad; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = col.surface; ctx.stroke();
+      ctx.font = "500 11px " + fam; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+      ctx.lineWidth = 3; ctx.strokeStyle = col.surface; ctx.strokeText("locationInMesh", p[0] + 8, p[1] - 4);
+      ctx.fillStyle = inside ? col.accent : col.bad; ctx.fillText("locationInMesh", p[0] + 8, p[1] - 4);
+    }
+
+    // axis triad
+    const o = [30, h - 30], len = 22;
+    const dir = (x, y, z) => { const sx = x * cy - y * sy, d0 = x * sy + y * cy; return [sx * len, -(z * ce + d0 * se) * len]; };
+    ctx.font = "600 11px " + fam; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (const [lab, d] of [["x", dir(1, 0, 0)], ["y", dir(0, 1, 0)], ["z", dir(0, 0, 1)]]) {
+      ctx.strokeStyle = col.muted; ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.moveTo(o[0], o[1]); ctx.lineTo(o[0] + d[0], o[1] + d[1]); ctx.stroke();
+      ctx.fillStyle = col.ink; ctx.fillText(lab, o[0] + d[0] * 1.35, o[1] + d[1] * 1.35);
+    }
+
+    cap.textContent = `${MESHES[sel].label} nett: ${fmtLen(m.L.x)} × ${fmtLen(m.L.y)} × ${fmtLen(m.L.z)}, ${M.n.x} × ${M.n.y} × ${M.n.z} celler.`
+      + (decimated > 1 ? ` Viser hver ${decimated}. cellelinje.` : "")
+      + " Dra eller bruk piltastene for å rotere.";
+  }
+
+  let drag = null;
+  cv.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY }; try { cv.setPointerCapture(e.pointerId); } catch (_) {} });
+  cv.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    drag = { x: e.clientX, y: e.clientY };
+    view.yaw += dx * 0.01;
+    view.elev = Math.max(-1.45, Math.min(1.45, view.elev + dy * 0.01));
+    draw();
+  });
+  const endDrag = () => { drag = null; };
+  cv.addEventListener("pointerup", endDrag); cv.addEventListener("pointercancel", endDrag);
+  cv.addEventListener("keydown", (e) => {
+    const step = 0.08;
+    if (e.key === "ArrowLeft") view.yaw -= step;
+    else if (e.key === "ArrowRight") view.yaw += step;
+    else if (e.key === "ArrowUp") view.elev = Math.min(1.45, view.elev + step);
+    else if (e.key === "ArrowDown") view.elev = Math.max(-1.45, view.elev - step);
+    else return;
+    e.preventDefault(); draw();
+  });
+  $("reset-view").addEventListener("click", () => { view.yaw = -0.62; view.elev = 0.42; draw(); });
+  if (window.ResizeObserver) new ResizeObserver(() => draw()).observe(cv.parentElement);
+  else window.addEventListener("resize", draw);
+  try { window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw); } catch (_) {}
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // ---------- actions ----------
+  function status(msg) { $("status").textContent = msg; }
+  function saveLocal(filename, data) {
+    const blob = data instanceof Blob ? data : new Blob([data], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.hidden = true;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+  function updateButtons() {
+    const ok = current && current.valid;
+    $("copy").disabled = !ok;
+    $("dl-one").disabled = !ok;
+    $("dl-zip").disabled = !(ok && window.JSZip);
+  }
+  function selectText(el) {
+    try { const r = document.createRange(); r.selectNodeContents(el); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); } catch (_) {}
+  }
+  function copyFrom(el, okMsg) {
+    const text = el.textContent;
+    let p;
+    try { p = navigator.clipboard.writeText(text); } catch (e) { p = Promise.reject(e); }
+    p.then(() => status(okMsg)).catch(() => { selectText(el); status("Kunne ikke kopiere automatisk. Teksten er merket, så trykk Ctrl+C."); });
+  }
+  $("copy").addEventListener("click", () => copyFrom($("dict"), `Kopiert. Lim inn i system/blockMeshDict for ${MESHES[sel].noun} nettet.`));
+  $("copy-cmds").addEventListener("click", () => copyFrom($("cmds"), "Kommandoene er kopiert."));
+
+  $("dl-one").addEventListener("click", () => {
+    if (!current || !current.valid) return;
+    try { saveLocal("blockMeshDict", $("dict").textContent); status(`Lastet ned blockMeshDict for ${MESHES[sel].noun} nettet. Legg den i system/ i caset.`); }
+    catch (e) { status("Kunne ikke laste ned. Bruk «Kopier» i stedet."); }
+  });
+  $("dl-zip").addEventListener("click", async () => {
+    if (!window.JSZip || !current || !current.valid) return;
+    const { m, meshes } = current;
+    try {
+      const zip = new window.JSZip();
+      for (const M of meshes) zip.file(`${M.key}/system/blockMeshDict`, makeDict(m, meshes, M));
+      zip.file("LESMEG.txt", makeReadme(m, meshes));
+      const blob = await zip.generateAsync({ type: "blob" });
+      saveLocal("blockMeshDict_tre_nett.zip", blob);
+      status("Lastet ned blockMeshDict_tre_nett.zip.");
+    } catch (e) { status("Kunne ikke lage zip-fila. Bruk «Kopier» i stedet."); }
+  });
+
+  // ---------- inputs ----------
+  document.addEventListener("input", (e) => { if (e.target.closest && e.target.closest("[data-key]")) render(); });
+  document.addEventListener("change", (e) => { if (e.target.closest && e.target.closest("[data-key]")) render(); });
+  for (const c of document.querySelectorAll("#r-chips .chip")) c.addEventListener("click", () => { $("r").value = c.dataset.r.replace(".", ","); render(); });
+  for (const b of document.querySelectorAll("#tabs button")) b.addEventListener("click", () => selectMesh(+b.dataset.i));
+  $("apply-delta").addEventListener("click", () => {
+    const d = parseNum($("delta").value);
+    if (!isFinite(d) || d <= 0) { $("delta").classList.add("invalid"); status("Skriv inn en cellestørrelse større enn 0."); return; }
+    $("delta").classList.remove("invalid");
+    const { m } = readModel();
+    for (const a of AX) {
+      if ($("n-" + a).disabled) continue;
+      if (isFinite(m.L[a]) && m.L[a] > 0) $("n-" + a).value = String(Math.max(1, Math.round(m.L[a] / d)));
+    }
+    status("Celletallene er fylt inn.");
+    render();
+  });
+  $("suggest").addEventListener("click", () => {
+    if (!current || !current.valid) return;
+    const { m, meshes } = current;
+    for (const a of AX) {
+      const v = suggestCoord(a, m, meshes);
+      $("loc-" + a).value = String(v).replace(".", ",");
+    }
+    status("locationInMesh er flyttet.");
+    render();
+  });
+
+  $("cmds").textContent = CMDS;
+  load();
+  render();
+})();
+</script>
+</body>
+</html>
