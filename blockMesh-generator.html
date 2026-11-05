@@ -1,10 +1,6 @@
-<!doctype html>
-<html lang="nb">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Lag blockMeshDict til OpenFOAM med tre systematisk raffinerte nett for nettuavhengighetsstudie (GCI), 3D-forhåndsvisning og sjekk av locationInMesh.">
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>blockMesh-generator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -40,11 +36,6 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
-body{margin:0}
-[hidden]{display:none!important}
-a{color:var(--accent)}
-.site-foot{padding-top:8px}
 body{
   background:var(--bg); color:var(--ink);
   font-family:var(--font-body); font-size:15px; line-height:1.5;
@@ -160,15 +151,13 @@ pre.dict.small{max-height:none}
 .status{font-size:.86rem; color:var(--accent); min-height:1.3em}
 @media (prefers-reduced-motion: reduce){*{transition:none!important; animation:none!important}}
 </style>
-</head>
-<body>
 
 <div class="wrap">
   <header class="top">
     <p class="eyebrow">OpenFOAM · blockMeshDict</p>
     <h1>blockMesh-generator</h1>
     <p class="lead">Lag bakgrunnsmeshet til snappyHexMesh og få tre systematisk raffinerte nett til nettuavhengighetsstudien. Fyll inn stegene, se boksen i forhåndsvisningen, og kopier eller last ned blockMeshDict.</p>
-    <p class="example-note">Feltene er fylt ut med eksempelverdier for et flomløp. Bytt dem ut med målene til ditt domene. Det du skriver, huskes i denne nettleseren. Kontroller alltid resultatet med <code>blockMesh</code> og <code>checkMesh</code>.</p>
+    <p class="example-note">Feltene er fylt ut med eksempelverdier for et flomløp. Bytt dem ut med målene til ditt domene. Det du skriver, huskes i denne nettleseren.</p>
   </header>
 
   <div class="layout">
@@ -246,7 +235,7 @@ pre.dict.small{max-height:none}
             <option value="z">z</option>
           </select>
         </div>
-        <p class="help">I 2D får tykkelsesretningen én celle på alle nettene, og flatene foran og bak blir patchen <code>frontAndBack</code> med type <code>empty</code>. Raffineringen gjelder da bare de to andre retningene.</p>
+        <p class="help">I 2D får tykkelsesretningen én celle på alle nettene, og flatene foran og bak blir patchene <code>front</code> og <code>back</code> med type <code>empty</code>. Raffineringen gjelder da bare de to andre retningene.</p>
 
         <h3 class="sub">Grading (simpleGrading)</h3>
         <div class="axis-grid three">
@@ -272,6 +261,24 @@ pre.dict.small{max-height:none}
             <tbody id="patch-body"></tbody>
           </table>
         </div>
+
+        <h3 class="sub">Delt innløp</h3>
+        <label class="check"><input type="checkbox" id="split" data-key="split" checked> Del innløpet (x min) i vann og luft</label>
+        <div class="row-fields">
+          <div class="field">
+            <label for="split-z">Vannhøyde ved innløpet, z</label>
+            <input type="text" inputmode="decimal" id="split-z" data-key="split-z" value="0,4">
+          </div>
+          <div class="field">
+            <label for="pn-inlo">Navn under vannhøyden</label>
+            <input type="text" id="pn-inlo" data-key="pn-inlo" value="inletWater" spellcheck="false">
+          </div>
+          <div class="field">
+            <label for="pn-inhi">Navn over vannhøyden</label>
+            <input type="text" id="pn-inhi" data-key="pn-inhi" value="inletAir" spellcheck="false">
+          </div>
+        </div>
+        <p class="help">Domenet deles i to blokker på vannhøyden, slik at innløpsflaten blir to patcher med typen fra x min-raden. Sett høyden lik vannstanden du bruker i <code>setFieldsDict</code> og randbetingelsene. Cellene i z fordeles på de to blokkene, så cellestørrelsen blir nesten den samme som uten deling.</p>
       </section>
 
       <section class="step" aria-labelledby="h6-loc">
@@ -321,11 +328,11 @@ pre.dict.small{max-height:none}
         <pre class="dict" id="dict" tabindex="0" aria-label="Innholdet i blockMeshDict"></pre>
         <div class="actions">
           <button class="btn btn-primary" id="copy" type="button">Kopier</button>
-          <button class="btn" id="dl-one" type="button" disabled>Last ned denne</button>
+          <button class="btn" id="dl-one" type="button" disabled>Last ned denne (.txt)</button>
           <button class="btn" id="dl-zip" type="button" disabled>Last ned alle tre (.zip)</button>
         </div>
         <p class="status" id="status" role="status" aria-live="polite"></p>
-        <p class="foot" id="dl-note">Zip-fila inneholder <code>grov/system/blockMeshDict</code>, <code>middels/system/blockMeshDict</code> og <code>fin/system/blockMeshDict</code>, pluss en LESMEG.txt med celletall og locationInMesh. «Last ned denne» lagrer fila som <code>blockMeshDict</code> for nettet som er valgt.</p>
+        <p class="foot" id="dl-note">Zip-fila inneholder <code>grov/system/blockMeshDict</code>, <code>middels/system/blockMeshDict</code> og <code>fin/system/blockMeshDict</code>, pluss en LESMEG.txt med celletall og locationInMesh. Fila fra «Last ned denne» må døpes om til <code>blockMeshDict</code> uten filendelse.</p>
       </div>
 
       <div class="card">
@@ -337,7 +344,6 @@ pre.dict.small{max-height:none}
       </div>
     </aside>
   </div>
-  <footer class="foot site-foot"><a href="https://github.com/eilivvole01/blockmesh-generator">Kildekode på GitHub</a></footer>
 </div>
 
 <script>
@@ -361,11 +367,12 @@ pre.dict.small{max-height:none}
   const FACE_ORDER = ["xmin", "xmax", "ymin", "ymax", "zmin", "zmax"];
   const PATCH_DEFAULTS = {
     xmin: ["inlet", "patch"], xmax: ["outlet", "patch"],
-    ymin: ["sides", "wall"], ymax: ["sides", "wall"],
-    zmin: ["bottom", "wall"], zmax: ["atmosphere", "patch"]
+    ymin: ["front", "wall"], ymax: ["back", "wall"],
+    zmin: ["bottomWall", "wall"], zmax: ["atmosphere", "patch"]
   };
   const PATCH_TYPES = ["patch", "wall", "symmetryPlane", "empty"];
-  const STORE = "blockmesh-generator-v1";
+  const STORE = "blockmesh-generator-v2";
+  const STORE_OLD = "blockmesh-generator-v1";
 
   // ---------- build patch rows ----------
   const pb = $("patch-body");
@@ -401,6 +408,13 @@ pre.dict.small{max-height:none}
   function load() {
     let data = null;
     try { const raw = localStorage.getItem(STORE); if (raw) data = JSON.parse(raw); } catch (e) { data = null; }
+    if (!data) {
+      // Older version: keep the domain and cell settings, but use the new patch names
+      try {
+        const raw = localStorage.getItem(STORE_OLD);
+        if (raw) { data = JSON.parse(raw); for (const k of Object.keys(data)) if (k.startsWith("pn-")) delete data[k]; }
+      } catch (e) { data = null; }
+    }
     if (!data) return;
     for (const el of keyed()) {
       const v = data[el.dataset.key];
@@ -451,7 +465,7 @@ pre.dict.small{max-height:none}
     }
     for (const f of FACE_ORDER) {
       const on = is2D && FACES[f].axis === thin;
-      lock($("pn-" + f), "frontAndBack", on);
+      lock($("pn-" + f), f.endsWith("min") ? "front" : "back", on);
       lock($("pt-" + f), "empty", on);
     }
   }
@@ -487,24 +501,57 @@ pre.dict.small{max-height:none}
     if (!isFinite(m.level) || m.level < 0 || m.level > 10 || m.level !== Math.round(m.level)) {
       bad.add("level"); errors.push("Raffineringsnivået må være et helt tall fra 0 til 10."); m.level = 0;
     }
+    // split inlet
+    const splitOn = $("split").checked;
+    m.split = { on: splitOn, z: parseNum($("split-z").value), lo: $("pn-inlo").value.trim(), hi: $("pn-inhi").value.trim() };
+    const NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+    const nameMsg = (what) => `Patchnavnet for ${what} kan bare inneholde bokstaver (a–z), tall og _, og kan ikke starte med et tall.`;
+    if (splitOn) {
+      if (!isFinite(m.split.z)) { bad.add("split-z"); errors.push("Skriv inn et tall for vannhøyden ved innløpet."); }
+      else if (isFinite(m.min.z) && isFinite(m.max.z) && !(m.split.z > m.min.z && m.split.z < m.max.z)) {
+        bad.add("split-z"); errors.push(`Vannhøyden må ligge mellom z fra (${fd(m.min.z)}) og z til (${fd(m.max.z)}).`);
+      }
+      if (!NAME_RE.test(m.split.lo)) { bad.add("pn-inlo"); errors.push(nameMsg("innløpet under vannhøyden")); }
+      if (!NAME_RE.test(m.split.hi)) { bad.add("pn-inhi"); errors.push(nameMsg("innløpet over vannhøyden")); }
+      if (m.split.lo === m.split.hi) { bad.add("pn-inhi"); errors.push("De to delene av innløpet må ha ulike navn."); }
+      if (m.is2D && m.thin === "z") { bad.add("split"); errors.push("Innløpet kan ikke deles i z når z er tykkelsesretningen i 2D."); }
+      if (m.is2D && m.thin === "x") { bad.add("split"); errors.push("Med x som tykkelsesretning i 2D er innløpsflaten front/back. Velg en annen tykkelsesretning eller slå av delt innløp."); }
+      if (isFinite(m.n.z) && m.n.z < 2) { bad.add("n-z"); errors.push("Delt innløp krever minst 2 celler i z."); }
+    }
+    if (!(m.is2D && m.thin === "x")) $("pn-xmin").disabled = splitOn;
+    $("pn-xmin").title = splitOn ? "Innløpet er delt. Navnene settes under «Delt innløp»." : "";
+
     m.patches = {};
     for (const f of FACE_ORDER) {
       const name = $("pn-" + f).value.trim(), type = $("pt-" + f).value;
       m.patches[f] = { name, type };
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
-        bad.add("pn-" + f);
-        errors.push(`Patchnavnet for ${FACES[f].label} kan bare inneholde bokstaver (a–z), tall og _, og kan ikke starte med et tall.`);
+      if (splitOn && f === "xmin") continue;
+      if (!NAME_RE.test(name)) { bad.add("pn-" + f); errors.push(nameMsg(FACES[f].label)); }
+    }
+    // face parts: which block each face belongs to, and its patch name
+    const parts = [];
+    for (const f of FACE_ORDER) {
+      const p = m.patches[f];
+      if (!splitOn) { parts.push({ f, block: 0, name: p.name, type: p.type }); continue; }
+      if (f === "zmin") parts.push({ f, block: 0, name: p.name, type: p.type });
+      else if (f === "zmax") parts.push({ f, block: 1, name: p.name, type: p.type });
+      else if (f === "xmin") {
+        parts.push({ f, block: 0, name: m.split.lo, type: p.type });
+        parts.push({ f, block: 1, name: m.split.hi, type: p.type });
+      } else {
+        parts.push({ f, block: 0, name: p.name, type: p.type });
+        parts.push({ f, block: 1, name: p.name, type: p.type });
       }
     }
+    m.parts = parts;
     // patch groups
     m.groups = [];
     const byName = new Map();
-    for (const f of FACE_ORDER) {
-      const p = m.patches[f];
-      if (!byName.has(p.name)) { const g = { name: p.name, type: p.type, faces: [f] }; byName.set(p.name, g); m.groups.push(g); }
+    for (const pt of parts) {
+      if (!byName.has(pt.name)) { const g = { name: pt.name, type: pt.type, parts: [pt] }; byName.set(pt.name, g); m.groups.push(g); }
       else {
-        const g = byName.get(p.name); g.faces.push(f);
-        if (g.type !== p.type) { bad.add("pt-" + f); errors.push(`Patchen «${p.name}» har ulike typer på flatene. Gi flatene samme type eller ulike navn.`); }
+        const g = byName.get(pt.name); g.parts.push(pt);
+        if (g.type !== pt.type) { bad.add("pt-" + pt.f); errors.push(`Patchen «${pt.name}» har ulike typer på flatene. Gi flatene samme type eller ulike navn.`); }
       }
     }
     return { m, errors, bad };
@@ -536,8 +583,31 @@ pre.dict.small{max-height:none}
       let h;
       if (m.is2D) h = Math.sqrt(m.L[inplane[0]] * m.L[inplane[1]] / (n[inplane[0]] * n[inplane[1]]));
       else h = Math.cbrt(m.L.x * m.L.y * m.L.z / N);
-      return Object.assign({ k, n, N, h }, M);
+      const zs = m.split.on ? splitZ(m, n.z) : null;
+      return Object.assign({ k, n, N, h, zs }, M);
     });
+  }
+  // Split the z cells into a block under and a block over the water height,
+  // keeping the cell spacing of the unsplit grading as closely as possible.
+  function splitZ(m, nz) {
+    const R = m.g.z, zc = m.split.z;
+    const q = (nz === 1 || Math.abs(R - 1) < 1e-12) ? 1 : Math.pow(R, 1 / (nz - 1));
+    const lines = gridLines(m.min.z, m.L.z, nz, R);
+    let n1 = 0;
+    for (let i = 1; i <= nz; i++) if ((lines[i - 1] + lines[i]) / 2 < zc) n1++;
+    n1 = Math.min(Math.max(n1, 1), nz - 1);
+    const n2 = nz - n1;
+    return { z: zc, n1, n2, g1: Math.pow(q, n1 - 1), g2: Math.pow(q, n2 - 1) };
+  }
+  // Grid lines along one axis for one mesh, including the split in z
+  function axisLines(m, M, a) {
+    if (a === "z" && M.zs) {
+      const s = M.zs;
+      const lo = gridLines(m.min.z, s.z - m.min.z, s.n1, s.g1);
+      const hi = gridLines(s.z, m.max.z - s.z, s.n2, s.g2);
+      return lo.concat(hi.slice(1));
+    }
+    return gridLines(m.min[a], m.L[a], M.n[a], m.g[a]);
   }
   function pointRatio(c, lines, level) {
     const lo = lines[0], hi = lines[lines.length - 1];
@@ -554,7 +624,7 @@ pre.dict.small{max-height:none}
     const res = meshes.map(M => {
       let worst = Infinity, worstAx = null;
       for (const a of AX) {
-        const lines = gridLines(m.min[a], m.L[a], M.n[a], m.g[a]);
+        const lines = axisLines(m, M, a);
         const r = pointRatio(m.loc[a], lines, m.level);
         if (r < worst) { worst = r; worstAx = a; }
       }
@@ -565,7 +635,7 @@ pre.dict.small{max-height:none}
   }
   function suggestCoord(a, m, meshes) {
     const lo = m.min[a], L = m.L[a];
-    const linesPer = meshes.map(M => gridLines(lo, L, M.n[a], m.g[a]));
+    const linesPer = meshes.map(M => axisLines(m, M, a));
     let cur = isFinite(m.loc[a]) ? m.loc[a] : lo + L / 2;
     cur = Math.min(Math.max(cur, lo + 0.02 * L), lo + 0.98 * L);
     const N = 24000, cands = [];
@@ -602,7 +672,12 @@ pre.dict.small{max-height:none}
   }
   function locText(m) { return `(${fd(m.loc.x)} ${fd(m.loc.y)} ${fd(m.loc.z)})`; }
   function makeDict(m, meshes, M) {
+    const s = M.zs;
     const V = verts(m);
+    if (s) { // 12 vertices: bottom (0-3), water height (4-7), top (8-11)
+      for (let i = 4; i < 8; i++) V[i] = [V[i][0], V[i][1], s.z];
+      for (let i = 0; i < 4; i++) V.push([V[i][0], V[i][1], m.max.z]);
+    }
     const lines = [];
     lines.push("FoamFile");
     lines.push("{");
@@ -616,12 +691,16 @@ pre.dict.small{max-height:none}
     lines.push(`// Nett: ${M.key} (nett ${M.gci} i GCI), raffineringsfaktor r = ${fd(m.r)}${m.is2D ? ", 2D (tykkelse i " + m.thin + ")" : ""}`);
     lines.push(`// Bakgrunnsceller: ${M.n.x} x ${M.n.y} x ${M.n.z} = ${M.N} (før snappyHexMesh)`);
     lines.push(`// locationInMesh til snappyHexMeshDict: ${locText(m)}`);
+    if (s) lines.push(`// Innløpet er delt på z = ${fd(s.z)}: ${m.split.lo} under, ${m.split.hi} over`);
     lines.push("");
     lines.push("convertToMeters 1;");
     lines.push("");
     lines.push(`nx ${M.n.x};`);
     lines.push(`ny ${M.n.y};`);
-    lines.push(`nz ${M.n.z};`);
+    if (s) {
+      lines.push(`nz1 ${s.n1};    // under vannhøyden`);
+      lines.push(`nz2 ${s.n2};    // over vannhøyden`);
+    } else lines.push(`nz ${M.n.z};`);
     lines.push("");
     lines.push("vertices");
     lines.push("(");
@@ -630,7 +709,12 @@ pre.dict.small{max-height:none}
     lines.push("");
     lines.push("blocks");
     lines.push("(");
-    lines.push(`    hex (0 1 2 3 4 5 6 7) ($nx $ny $nz) simpleGrading (${fd(m.g.x)} ${fd(m.g.y)} ${fd(m.g.z)})`);
+    if (s) {
+      lines.push(`    hex (0 1 2 3 4 5 6 7) ($nx $ny $nz1) simpleGrading (${fd(m.g.x)} ${fd(m.g.y)} ${fd(s.g1)})    // under vannhøyden`);
+      lines.push(`    hex (4 5 6 7 8 9 10 11) ($nx $ny $nz2) simpleGrading (${fd(m.g.x)} ${fd(m.g.y)} ${fd(s.g2)})    // over vannhøyden`);
+    } else {
+      lines.push(`    hex (0 1 2 3 4 5 6 7) ($nx $ny $nz) simpleGrading (${fd(m.g.x)} ${fd(m.g.y)} ${fd(m.g.z)})`);
+    }
     lines.push(");");
     lines.push("");
     lines.push("edges");
@@ -645,7 +729,11 @@ pre.dict.small{max-height:none}
       lines.push(`        type ${g.type};`);
       lines.push("        faces");
       lines.push("        (");
-      for (const f of g.faces) lines.push(`            (${FACES[f].verts.join(" ")})    // ${FACES[f].label}`);
+      for (const pt of g.parts) {
+        const off = pt.block === 1 ? 4 : 0;
+        const where = s ? (pt.block === 1 ? ", øvre blokk" : ", nedre blokk") : "";
+        lines.push(`            (${FACES[pt.f].verts.map(v => v + off).join(" ")})    // ${FACES[pt.f].label}${where}`);
+      }
       lines.push("        );");
       lines.push("    }");
     }
@@ -673,6 +761,10 @@ pre.dict.small{max-height:none}
     out.push("Celletallene gjelder bakgrunnsmeshet fra blockMesh. snappyHexMesh legger til celler,");
     out.push("så bruk antall celler fra checkMesh når du regner ut h og r til GCI.");
     out.push("");
+    if (m.split.on) {
+      out.push(`Innløpet er delt på z = ${fd(m.split.z)}: ${m.split.lo} under, ${m.split.hi} over.`);
+      out.push("");
+    }
     out.push("locationInMesh (samme i alle tre snappyHexMeshDict):");
     out.push("  " + locText(m));
     out.push("");
@@ -787,6 +879,7 @@ pre.dict.small{max-height:none}
     if (meshes[2].N > 5e6) notes.push({ kind: "warn", text: `Det fine nettet har ${nint(meshes[2].N)} bakgrunnsceller før snappyHexMesh. Sjekk at maskinen har nok minne.` });
     if (!m.is2D && FACE_ORDER.some(f => m.patches[f].type === "empty")) notes.push({ kind: "warn", text: "Typen empty brukes bare i 2D. I 3D bør flaten være patch, wall eller symmetryPlane." });
     if (m.is2D && m.n[m.thin] !== 1) { /* thin is forced to 1 */ }
+    if (S.zs) notes.push({ kind: "info", text: `Innløpet er delt på z = ${nb(S.zs.z, 3)}. ${MESHES[sel].label} nett har ${S.zs.n1} celler i z under vannhøyden (${m.split.lo}) og ${S.zs.n2} over (${m.split.hi}).` });
 
     const lc = locCheck(m, meshes);
     setLocStatus(lc, m, meshes);
@@ -906,7 +999,7 @@ pre.dict.small{max-height:none}
     // faces + grid
     let decimated = 1;
     const lineCache = {};
-    for (const a of AX) lineCache[a] = gridLines(m.min[a], m.L[a], M.n[a], m.g[a]);
+    for (const a of AX) lineCache[a] = axisLines(m, M, a);
     for (const f of FACE_ORDER) {
       if (!visible[f]) continue;
       const vs = FACES[f].verts;
@@ -941,11 +1034,25 @@ pre.dict.small{max-height:none}
     for (const f of FACE_ORDER) {
       if (!visible[f]) continue;
       const vs = FACES[f].verts;
+      const putLabel = (label, x, y, color) => {
+        ctx.lineWidth = 3; ctx.strokeStyle = col.surface; ctx.strokeText(label, x, y);
+        ctx.fillStyle = color; ctx.fillText(label, x, y);
+      };
+      if (M.zs && f === "xmin") {
+        const x0 = m.min.x, ym = (m.min.y + m.max.y) / 2;
+        putLabel(m.split.lo, ...T(x0, ym, (m.min.z + M.zs.z) / 2), col.accent);
+        putLabel(m.split.hi, ...T(x0, ym, (M.zs.z + m.max.z) / 2), col.accent);
+        continue;
+      }
       let sx = 0, syy = 0; for (const v of vs) { sx += PT[v][0]; syy += PT[v][1]; }
       sx /= 4; syy /= 4;
-      const label = m.patches[f].name || "?";
-      ctx.lineWidth = 3; ctx.strokeStyle = col.surface; ctx.strokeText(label, sx, syy);
-      ctx.fillStyle = col.muted; ctx.fillText(label, sx, syy);
+      putLabel(m.patches[f].name || "?", sx, syy, col.muted);
+    }
+
+    // water height on the inlet face
+    if (M.zs && visible.xmin) {
+      ctx.strokeStyle = col.accent; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(...T(m.min.x, m.min.y, M.zs.z)); ctx.lineTo(...T(m.min.x, m.max.y, M.zs.z)); ctx.stroke();
     }
 
     // locationInMesh
@@ -1012,19 +1119,15 @@ pre.dict.small{max-height:none}
 
   // ---------- actions ----------
   function status(msg) { $("status").textContent = msg; }
-  function saveLocal(filename, data) {
-    const blob = data instanceof Blob ? data : new Blob([data], { type: "application/octet-stream" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = filename; a.hidden = true;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-  }
+  let downloadsApi = null, downloadsResolved = false;
   function updateButtons() {
     const ok = current && current.valid;
     $("copy").disabled = !ok;
-    $("dl-one").disabled = !ok;
-    $("dl-zip").disabled = !(ok && window.JSZip);
+    $("dl-one").disabled = !(ok && downloadsApi);
+    $("dl-zip").disabled = !(ok && downloadsApi && window.JSZip);
+    if (downloadsResolved && !downloadsApi) {
+      $("dl-note").textContent = "Nedlasting er ikke tilgjengelig i denne visningen. Bruk «Kopier» og lim teksten inn i system/blockMeshDict.";
+    }
   }
   function selectText(el) {
     try { const r = document.createRange(); r.selectNodeContents(el); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); } catch (_) {}
@@ -1038,23 +1141,38 @@ pre.dict.small{max-height:none}
   $("copy").addEventListener("click", () => copyFrom($("dict"), `Kopiert. Lim inn i system/blockMeshDict for ${MESHES[sel].noun} nettet.`));
   $("copy-cmds").addEventListener("click", () => copyFrom($("cmds"), "Kommandoene er kopiert."));
 
-  $("dl-one").addEventListener("click", () => {
-    if (!current || !current.valid) return;
-    try { saveLocal("blockMeshDict", $("dict").textContent); status(`Lastet ned blockMeshDict for ${MESHES[sel].noun} nettet. Legg den i system/ i caset.`); }
-    catch (e) { status("Kunne ikke laste ned. Bruk «Kopier» i stedet."); }
+  function saveError(e) {
+    const code = e && e.code;
+    if (code === "declined") status("Nedlastingen ble avbrutt.");
+    else if (code === "rate_limited") status("Vent litt og prøv igjen.");
+    else status("Kunne ikke laste ned her. Bruk «Kopier» i stedet.");
+  }
+  $("dl-one").addEventListener("click", async () => {
+    if (!downloadsApi || !current || !current.valid) return;
+    const M = current.meshes[sel];
+    const name = `blockMeshDict_${M.key}.txt`;
+    try { await downloadsApi.save({ filename: name, data: $("dict").textContent }); status(`Lagret ${name}. Døp den om til blockMeshDict og legg den i system/.`); }
+    catch (e) { saveError(e); }
   });
   $("dl-zip").addEventListener("click", async () => {
-    if (!window.JSZip || !current || !current.valid) return;
+    if (!downloadsApi || !window.JSZip || !current || !current.valid) return;
     const { m, meshes } = current;
     try {
       const zip = new window.JSZip();
       for (const M of meshes) zip.file(`${M.key}/system/blockMeshDict`, makeDict(m, meshes, M));
       zip.file("LESMEG.txt", makeReadme(m, meshes));
       const blob = await zip.generateAsync({ type: "blob" });
-      saveLocal("blockMeshDict_tre_nett.zip", blob);
-      status("Lastet ned blockMeshDict_tre_nett.zip.");
-    } catch (e) { status("Kunne ikke lage zip-fila. Bruk «Kopier» i stedet."); }
+      await downloadsApi.save({ filename: "blockMeshDict_tre_nett.zip", data: blob });
+      status("Lagret blockMeshDict_tre_nett.zip.");
+    } catch (e) { saveError(e); }
   });
+
+  (async () => {
+    try { downloadsApi = (window.claude && typeof window.claude.use === "function") ? await window.claude.use("downloads") : null; }
+    catch (_) { downloadsApi = null; }
+    downloadsResolved = true;
+    updateButtons();
+  })();
 
   // ---------- inputs ----------
   document.addEventListener("input", (e) => { if (e.target.closest && e.target.closest("[data-key]")) render(); });
@@ -1089,5 +1207,6 @@ pre.dict.small{max-height:none}
   render();
 })();
 </script>
-</body>
-</html>
+
+
+</body></html>
